@@ -1,0 +1,1069 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Air Quality Monitor</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;700;800&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg: #0a0e1a;
+    --surface: #111827;
+    --surface2: #1a2235;
+    --border: #1e2d45;
+    --accent: #00e5ff;
+    --accent2: #ff6b35;
+    --good: #00e676;
+    --moderate: #ffeb3b;
+    --bad: #ff7043;
+    --danger: #f44336;
+    --text: #e0eaf8;
+    --text-dim: #5a7a9a;
+    --font-mono: 'Space Mono', monospace;
+    --font-display: 'Syne', sans-serif;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Background grid */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .container {
+    position: relative;
+    z-index: 1;
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 24px;
+  }
+
+  /* Header */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+  }
+
+  .logo-icon {
+    width: 44px; height: 44px;
+    border: 2px solid var(--accent);
+    border-radius: 10px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 20px;
+    box-shadow: 0 0 16px rgba(0,229,255,0.2);
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: 0 0 16px rgba(0,229,255,0.2); }
+    50% { box-shadow: 0 0 28px rgba(0,229,255,0.5); }
+  }
+
+  .logo h1 {
+    font-family: var(--font-display);
+    font-size: 22px;
+    font-weight: 800;
+    letter-spacing: -0.5px;
+  }
+
+  .logo h1 span { color: var(--accent); }
+
+  .header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+  }
+
+  .status-badge {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 20px;
+    border: 1px solid var(--border);
+    font-size: 12px;
+    background: var(--surface);
+    transition: all 0.3s;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: all 0.3s;
+  }
+
+  .status-badge.connected .status-dot {
+    background: var(--good);
+    box-shadow: 0 0 8px var(--good);
+    animation: blink 2s infinite;
+  }
+
+  @keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.4; }
+  }
+
+  .btn {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid var(--accent);
+    background: transparent;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+
+  .btn:hover {
+    background: rgba(0,229,255,0.1);
+    box-shadow: 0 0 12px rgba(0,229,255,0.2);
+  }
+
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  .btn-sheets {
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: 1px solid #34a853;
+    background: transparent;
+    color: #34a853;
+    font-family: var(--font-mono);
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s;
+    letter-spacing: 1px;
+  }
+  .btn-sheets:hover { background: rgba(52,168,83,0.1); box-shadow: 0 0 12px rgba(52,168,83,0.2); }
+
+  .sheets-config {
+    background: var(--surface);
+    border: 1px solid #34a853;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+    display: none;
+  }
+  .sheets-config.show { display: block; }
+  .sheets-config h3 { font-family: var(--font-display); font-size: 14px; color: #34a853; margin-bottom: 14px; }
+  .sheets-input {
+    width: 100%;
+    background: var(--surface2);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 10px 14px;
+    color: var(--text);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    margin-bottom: 10px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+  .sheets-input:focus { border-color: #34a853; }
+  .sheets-status { font-size: 11px; margin-top: 8px; }
+  .sheets-status.ok { color: #34a853; }
+  .sheets-status.err { color: var(--danger); }
+
+  /* AQI Main Card */
+  .aqi-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 28px;
+    margin-bottom: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 24px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .aqi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--aqi-color, var(--good));
+    transition: background 0.5s;
+  }
+
+  .aqi-left { flex: 1; }
+  .aqi-label {
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 8px;
+  }
+
+  .aqi-value {
+    font-family: var(--font-display);
+    font-size: 64px;
+    font-weight: 800;
+    line-height: 1;
+    color: var(--aqi-color, var(--good));
+    text-shadow: 0 0 30px var(--aqi-color, var(--good));
+    transition: all 0.5s;
+  }
+
+  .aqi-status {
+    font-size: 18px;
+    font-weight: 700;
+    margin-top: 8px;
+    color: var(--aqi-color, var(--good));
+  }
+
+  .aqi-desc {
+    font-size: 12px;
+    color: var(--text-dim);
+    margin-top: 6px;
+    max-width: 300px;
+    line-height: 1.6;
+  }
+
+  /* Gauge */
+  .gauge-wrap {
+    position: relative;
+    width: 180px; height: 100px;
+    flex-shrink: 0;
+  }
+
+  .gauge-wrap canvas { width: 100% !important; }
+
+  .gauge-center {
+    position: absolute;
+    bottom: 0; left: 50%;
+    transform: translateX(-50%);
+    text-align: center;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  /* Alert banner */
+  .alert-banner {
+    display: none;
+    background: linear-gradient(135deg, rgba(244,67,54,0.15), rgba(255,107,53,0.1));
+    border: 1px solid var(--danger);
+    border-radius: 12px;
+    padding: 16px 20px;
+    margin-bottom: 24px;
+    animation: alert-pulse 2s ease-in-out infinite;
+  }
+
+  .alert-banner.show { display: flex; align-items: center; gap: 12px; }
+
+  @keyframes alert-pulse {
+    0%, 100% { border-color: var(--danger); }
+    50% { border-color: var(--accent2); box-shadow: 0 0 20px rgba(244,67,54,0.3); }
+  }
+
+  .alert-icon { font-size: 24px; }
+  .alert-text { font-size: 13px; line-height: 1.5; }
+  .alert-text strong { color: var(--danger); display: block; margin-bottom: 2px; }
+
+  /* Grid */
+  .grid-3 {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .grid-2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    transition: border-color 0.3s;
+  }
+
+  .card:hover { border-color: rgba(0,229,255,0.3); }
+
+  .card-label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+
+  /* PM Cards */
+  .pm-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+
+  .pm-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+    transition: all 0.3s;
+  }
+
+  .pm-card::after {
+    content: '';
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    height: 3px;
+    background: var(--card-color, var(--accent));
+    opacity: 0.6;
+  }
+
+  .pm-name {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 1px;
+    margin-bottom: 8px;
+  }
+
+  .pm-val {
+    font-family: var(--font-display);
+    font-size: 28px;
+    font-weight: 800;
+    color: var(--card-color, var(--accent));
+    text-shadow: 0 0 20px var(--card-color, rgba(0,229,255,0.3));
+    transition: all 0.5s;
+  }
+
+  .pm-unit {
+    font-size: 9px;
+    color: var(--text-dim);
+    margin-top: 2px;
+  }
+
+  .pm-bar-wrap {
+    margin-top: 10px;
+    height: 4px;
+    background: var(--surface2);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+
+  .pm-bar {
+    height: 100%;
+    border-radius: 2px;
+    background: var(--card-color, var(--accent));
+    transition: width 0.8s ease;
+  }
+
+  /* NC Cards */
+  .nc-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+    margin-bottom: 24px;
+  }
+
+  .nc-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 14px 10px;
+    text-align: center;
+  }
+
+  .nc-name { font-size: 9px; color: var(--text-dim); margin-bottom: 6px; letter-spacing: 1px; }
+  .nc-val {
+    font-family: var(--font-display);
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .nc-unit { font-size: 8px; color: var(--text-dim); margin-top: 2px; }
+
+  /* Chart */
+  .chart-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .chart-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 16px;
+  }
+
+  .chart-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .chart-legend {
+    display: flex;
+    gap: 16px;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  .legend-dot {
+    display: inline-block;
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    margin-right: 4px;
+  }
+
+  /* History */
+  .history-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    margin-bottom: 24px;
+  }
+
+  .history-title {
+    font-family: var(--font-display);
+    font-size: 14px;
+    font-weight: 700;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .history-count {
+    font-size: 11px;
+    color: var(--text-dim);
+    font-family: var(--font-mono);
+  }
+
+  .history-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 11px;
+  }
+
+  .history-table th {
+    text-align: left;
+    color: var(--text-dim);
+    padding: 6px 10px;
+    border-bottom: 1px solid var(--border);
+    letter-spacing: 1px;
+    font-size: 10px;
+  }
+
+  .history-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(30,45,69,0.5);
+    transition: background 0.2s;
+  }
+
+  .history-table tr:hover td { background: var(--surface2); }
+
+  .badge {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .badge-good { background: rgba(0,230,118,0.15); color: var(--good); }
+  .badge-moderate { background: rgba(255,235,59,0.15); color: var(--moderate); }
+  .badge-bad { background: rgba(255,112,67,0.15); color: var(--bad); }
+  .badge-danger { background: rgba(244,67,54,0.15); color: var(--danger); }
+
+  /* Size indicator */
+  .size-card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+  }
+
+  .size-visual {
+    position: relative;
+    width: 80px; height: 80px;
+    display: flex; align-items: center; justify-content: center;
+  }
+
+  .size-circle {
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(0,229,255,0.3), rgba(0,229,255,0.05));
+    border: 1px solid rgba(0,229,255,0.4);
+    transition: all 0.8s ease;
+  }
+
+  .size-num {
+    font-family: var(--font-display);
+    font-size: 32px;
+    font-weight: 800;
+    color: var(--accent);
+  }
+
+  .size-unit { font-size: 12px; color: var(--text-dim); }
+
+  /* Placeholder */
+  .placeholder {
+    text-align: center;
+    padding: 60px 20px;
+    color: var(--text-dim);
+  }
+
+  .placeholder-icon { font-size: 48px; margin-bottom: 16px; opacity: 0.4; }
+  .placeholder p { font-size: 13px; line-height: 1.8; }
+
+  .timestamp {
+    font-size: 10px;
+    color: var(--text-dim);
+    text-align: right;
+    margin-top: -16px;
+    margin-bottom: 24px;
+  }
+
+  @media (max-width: 900px) {
+    .pm-grid { grid-template-columns: repeat(2, 1fr); }
+    .nc-grid { grid-template-columns: repeat(3, 1fr); }
+    .grid-2 { grid-template-columns: 1fr; }
+    .aqi-card { flex-direction: column; }
+  }
+</style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🌬️</div>
+      <div>
+        <h1>Air<span>Quality</span> Monitor</h1>
+        <div style="font-size:10px;color:var(--text-dim);letter-spacing:1px">SPS30 · Arduino UNO</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-badge" id="statusBadge">
+        <div class="status-dot" id="statusDot"></div>
+        <span id="statusText">Déconnecté</span>
+      </div>
+      <button class="btn-sheets" onclick="toggleSheetsConfig()">📊 GOOGLE SHEETS</button>
+      <button class="btn" onclick="exportCSV()" style="border-color:#ffeb3b;color:#ffeb3b">⬇ CSV</button>
+      <button class="btn" id="connectBtn" onclick="connectSerial()">⚡ CONNECTER</button>
+      <button class="btn" id="disconnectBtn" onclick="disconnectSerial()" style="display:none;border-color:var(--accent2);color:var(--accent2)">✕ DÉCONNECTER</button>
+    </div>
+  </header>
+
+  <!-- Google Sheets Config -->
+  <div class="sheets-config" id="sheetsConfig">
+    <h3>📊 Connexion Google Sheets</h3>
+    <div style="font-size:11px;color:var(--text-dim);margin-bottom:12px;line-height:1.7">
+      1. Va sur <a href="https://script.google.com" target="_blank" style="color:#34a853">script.google.com</a> → Nouveau projet<br>
+      2. Colle le code Apps Script (voir documentation)<br>
+      3. Déploie → Application Web → Copie l'URL ici
+    </div>
+    <input class="sheets-input" id="sheetsUrl" type="text" placeholder="https://script.google.com/macros/s/XXXXXXX/exec" />
+    <div style="display:flex;gap:10px">
+      <button class="btn-sheets" onclick="saveSheetUrl()">✓ ENREGISTRER</button>
+      <button class="btn" onclick="testSheets()" style="font-size:11px">Tester la connexion</button>
+    </div>
+    <div class="sheets-status" id="sheetsStatus"></div>
+  </div>
+
+  <!-- Alert -->
+  <div class="alert-banner" id="alertBanner">
+    <div class="alert-icon">⚠️</div>
+    <div class="alert-text">
+      <strong id="alertTitle">ALERTE QUALITÉ D'AIR</strong>
+      <span id="alertMsg">Niveau élevé détecté. Vérifiez si une imprimante 3D est active.</span>
+    </div>
+  </div>
+
+  <!-- AQI Card -->
+  <div class="aqi-card" id="aqiCard">
+    <div class="aqi-left">
+      <div class="aqi-label">Indice Qualité de l'Air · PM2.5</div>
+      <div class="aqi-value" id="aqiValue">--</div>
+      <div class="aqi-status" id="aqiStatus">En attente de données...</div>
+      <div class="aqi-desc" id="aqiDesc">Connectez votre Arduino pour commencer la surveillance.</div>
+    </div>
+    <div>
+      <canvas id="gaugeCanvas" width="200" height="110"></canvas>
+    </div>
+  </div>
+
+  <div class="timestamp" id="timestamp"></div>
+
+  <!-- PM Values -->
+  <div style="font-family:var(--font-display);font-size:12px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:12px">Masse des particules · µg/m³</div>
+  <div class="pm-grid">
+    <div class="pm-card" style="--card-color:#00e5ff">
+      <div class="pm-name">PM 1.0</div>
+      <div class="pm-val" id="pm1">--</div>
+      <div class="pm-unit">µg/m³</div>
+      <div class="pm-bar-wrap"><div class="pm-bar" id="bar-pm1" style="width:0%"></div></div>
+    </div>
+    <div class="pm-card" style="--card-color:#7c4dff">
+      <div class="pm-name">PM 2.5</div>
+      <div class="pm-val" id="pm25">--</div>
+      <div class="pm-unit">µg/m³</div>
+      <div class="pm-bar-wrap"><div class="pm-bar" id="bar-pm25" style="width:0%"></div></div>
+    </div>
+    <div class="pm-card" style="--card-color:#ff6b35">
+      <div class="pm-name">PM 4.0</div>
+      <div class="pm-val" id="pm4">--</div>
+      <div class="pm-unit">µg/m³</div>
+      <div class="pm-bar-wrap"><div class="pm-bar" id="bar-pm4" style="width:0%"></div></div>
+    </div>
+    <div class="pm-card" style="--card-color:#ff4081">
+      <div class="pm-name">PM 10.0</div>
+      <div class="pm-val" id="pm10">--</div>
+      <div class="pm-unit">µg/m³</div>
+      <div class="pm-bar-wrap"><div class="pm-bar" id="bar-pm10" style="width:0%"></div></div>
+    </div>
+  </div>
+
+  <!-- NC Values -->
+  <div style="font-family:var(--font-display);font-size:12px;letter-spacing:2px;color:var(--text-dim);text-transform:uppercase;margin-bottom:12px">Nombre de particules · nb/cm³</div>
+  <div class="nc-grid">
+    <div class="nc-card">
+      <div class="nc-name">NC 0.5</div>
+      <div class="nc-val" id="nc05">--</div>
+      <div class="nc-unit">nb/cm³</div>
+    </div>
+    <div class="nc-card">
+      <div class="nc-name">NC 1.0</div>
+      <div class="nc-val" id="nc1">--</div>
+      <div class="nc-unit">nb/cm³</div>
+    </div>
+    <div class="nc-card">
+      <div class="nc-name">NC 2.5</div>
+      <div class="nc-val" id="nc25">--</div>
+      <div class="nc-unit">nb/cm³</div>
+    </div>
+    <div class="nc-card">
+      <div class="nc-name">NC 4.0</div>
+      <div class="nc-val" id="nc4">--</div>
+      <div class="nc-unit">nb/cm³</div>
+    </div>
+    <div class="nc-card">
+      <div class="nc-name">NC 10.0</div>
+      <div class="nc-val" id="nc10">--</div>
+      <div class="nc-unit">nb/cm³</div>
+    </div>
+  </div>
+
+  <!-- Chart + Size -->
+  <div class="grid-2">
+    <div class="chart-card">
+      <div class="chart-header">
+        <div class="chart-title">Historique PM</div>
+        <div class="chart-legend">
+          <span><span class="legend-dot" style="background:#00e5ff"></span>PM1</span>
+          <span><span class="legend-dot" style="background:#7c4dff"></span>PM2.5</span>
+          <span><span class="legend-dot" style="background:#ff6b35"></span>PM10</span>
+        </div>
+      </div>
+      <canvas id="pmChart" height="160"></canvas>
+    </div>
+
+    <div class="card">
+      <div class="card-label">Taille typique des particules</div>
+      <div class="size-card">
+        <div style="flex:1">
+          <div style="font-family:var(--font-display);font-size:48px;font-weight:800;color:var(--accent)" id="sizeVal">--</div>
+          <div style="font-size:12px;color:var(--text-dim)">micromètres (µm)</div>
+          <div style="margin-top:16px;font-size:11px;color:var(--text-dim);line-height:1.8" id="sizeDesc">
+            En attente de mesure...
+          </div>
+        </div>
+        <div style="text-align:center">
+          <div id="sizeCircle" style="width:60px;height:60px;border-radius:50%;background:radial-gradient(circle,rgba(0,229,255,0.3),rgba(0,229,255,0.05));border:1px solid rgba(0,229,255,0.4);transition:all 0.8s;margin:0 auto 8px"></div>
+          <div style="font-size:9px;color:var(--text-dim)">taille relative</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- History Table -->
+  <div class="history-card">
+    <div class="history-title">
+      Historique des mesures
+      <span class="history-count" id="histCount">0 mesure(s)</span>
+    </div>
+    <div style="overflow-x:auto;max-height:260px;overflow-y:auto">
+      <table class="history-table">
+        <thead>
+          <tr>
+            <th>Heure</th>
+            <th>PM1</th>
+            <th>PM2.5</th>
+            <th>PM4</th>
+            <th>PM10</th>
+            <th>NC10</th>
+            <th>Taille</th>
+            <th>Qualité</th>
+          </tr>
+        </thead>
+        <tbody id="historyBody">
+          <tr><td colspan="8" style="text-align:center;color:var(--text-dim);padding:30px">Aucune donnée pour le moment</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  let port, reader, readLoop;
+  let history = [];
+  let chartLabels = [], chartPM1 = [], chartPM25 = [], chartPM10 = [];
+  let pmChart;
+  let gaugeCtx;
+  let sheetsUrl = localStorage.getItem('sheetsUrl') || '';
+
+  // Init Sheets URL input
+  window.addEventListener('load', () => {
+    if (sheetsUrl) document.getElementById('sheetsUrl').value = sheetsUrl;
+  });
+
+  function toggleSheetsConfig() {
+    const el = document.getElementById('sheetsConfig');
+    el.classList.toggle('show');
+  }
+
+  function saveSheetUrl() {
+    sheetsUrl = document.getElementById('sheetsUrl').value.trim();
+    localStorage.setItem('sheetsUrl', sheetsUrl);
+    document.getElementById('sheetsStatus').className = 'sheets-status ok';
+    document.getElementById('sheetsStatus').textContent = '✓ URL enregistrée !';
+  }
+
+  async function testSheets() {
+    if (!sheetsUrl) {
+      document.getElementById('sheetsStatus').className = 'sheets-status err';
+      document.getElementById('sheetsStatus').textContent = '✗ Aucune URL configurée';
+      return;
+    }
+    document.getElementById('sheetsStatus').className = 'sheets-status';
+    document.getElementById('sheetsStatus').textContent = 'Test en cours...';
+    const testData = { pm1:1.1, pm25:2.2, pm4:3.3, pm10:4.4, nc05:0, nc1:1, nc25:2, nc4:3, nc10:4, size:1.5, quality:'TEST', timestamp: new Date().toISOString() };
+    const ok = await sendToSheets(testData);
+    document.getElementById('sheetsStatus').className = 'sheets-status ' + (ok ? 'ok' : 'err');
+    document.getElementById('sheetsStatus').textContent = ok ? '✓ Connexion réussie ! Vérifiez votre Google Sheets.' : '✗ Erreur — vérifiez l\'URL Apps Script';
+  }
+
+  async function sendToSheets(data) {
+    if (!sheetsUrl) return false;
+    try {
+      await fetch(sheetsUrl, {
+        method: 'POST',
+        mode: 'no-cors',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data)
+      });
+      return true;
+    } catch(e) {
+      console.error('Sheets error:', e);
+      return false;
+    }
+  }
+
+  function exportCSV() {
+    if (history.length === 0) { alert('Aucune donnée à exporter !'); return; }
+    const header = 'Heure,PM1,PM2.5,PM4,PM10,NC10,Taille(µm),Qualité\n';
+    const rows = [...history].reverse().map(h =>
+      `${h.time},${h.pm1.toFixed(2)},${h.pm25.toFixed(2)},${h.pm4.toFixed(2)},${h.pm10.toFixed(2)},${h.nc10.toFixed(1)},${h.size.toFixed(2)},${h.label}`
+    ).join('\n');
+    const blob = new Blob([header + rows], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `air_quality_${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // Init Chart
+  window.addEventListener('load', () => {
+    const ctx = document.getElementById('pmChart').getContext('2d');
+    pmChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: chartLabels,
+        datasets: [
+          { label: 'PM1', data: chartPM1, borderColor: '#00e5ff', backgroundColor: 'rgba(0,229,255,0.05)', tension: 0.4, pointRadius: 3, borderWidth: 2 },
+          { label: 'PM2.5', data: chartPM25, borderColor: '#7c4dff', backgroundColor: 'rgba(124,77,255,0.05)', tension: 0.4, pointRadius: 3, borderWidth: 2 },
+          { label: 'PM10', data: chartPM10, borderColor: '#ff4081', backgroundColor: 'rgba(255,64,129,0.05)', tension: 0.4, pointRadius: 3, borderWidth: 2 },
+        ]
+      },
+      options: {
+        responsive: true,
+        plugins: { legend: { display: false } },
+        scales: {
+          x: { ticks: { color: '#5a7a9a', font: { family: 'Space Mono', size: 9 } }, grid: { color: '#1e2d45' } },
+          y: { ticks: { color: '#5a7a9a', font: { family: 'Space Mono', size: 9 } }, grid: { color: '#1e2d45' } }
+        }
+      }
+    });
+
+    gaugeCtx = document.getElementById('gaugeCanvas').getContext('2d');
+    drawGauge(0, '#5a7a9a');
+  });
+
+  function drawGauge(pct, color) {
+    const c = gaugeCtx;
+    const W = 200, H = 110;
+    c.clearRect(0, 0, W, H);
+    const cx = W / 2, cy = H - 10, r = 80;
+    const startA = Math.PI, endA = 2 * Math.PI;
+
+    // BG arc
+    c.beginPath();
+    c.arc(cx, cy, r, startA, endA);
+    c.strokeStyle = '#1e2d45';
+    c.lineWidth = 14;
+    c.lineCap = 'round';
+    c.stroke();
+
+    // Color zones
+    const zones = [
+      { end: 0.267, color: '#00e676' },
+      { end: 0.533, color: '#ffeb3b' },
+      { end: 0.8, color: '#ff7043' },
+      { end: 1.0, color: '#f44336' }
+    ];
+    let prev = 0;
+    zones.forEach(z => {
+      c.beginPath();
+      c.arc(cx, cy, r, startA + prev * Math.PI, startA + z.end * Math.PI);
+      c.strokeStyle = z.color;
+      c.lineWidth = 14;
+      c.stroke();
+      prev = z.end;
+    });
+
+    // Needle
+    const angle = Math.PI + pct * Math.PI;
+    const nx = cx + (r - 20) * Math.cos(angle);
+    const ny = cy + (r - 20) * Math.sin(angle);
+    c.beginPath();
+    c.moveTo(cx, cy);
+    c.lineTo(nx, ny);
+    c.strokeStyle = color;
+    c.lineWidth = 3;
+    c.lineCap = 'round';
+    c.stroke();
+
+    // Center dot
+    c.beginPath();
+    c.arc(cx, cy, 6, 0, 2 * Math.PI);
+    c.fillStyle = color;
+    c.fill();
+
+    // Labels
+    c.font = '10px Space Mono';
+    c.fillStyle = '#5a7a9a';
+    c.fillText('0', cx - r + 2, cy + 14);
+    c.fillText('75', cx + r - 22, cy + 14);
+    c.fillText('BON', cx - 12, cy - r + 24);
+  }
+
+  async function connectSerial() {
+    if (!('serial' in navigator)) {
+      alert('⚠️ Web Serial API non supporté.\nUtilisez Google Chrome ou Microsoft Edge.');
+      return;
+    }
+    try {
+      port = await navigator.serial.requestPort();
+      await port.open({ baudRate: 115200 });
+      setConnected(true);
+      startReading();
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function disconnectSerial() {
+    if (reader) { await reader.cancel(); }
+    if (port) { await port.close(); }
+    setConnected(false);
+  }
+
+  function setConnected(c) {
+    document.getElementById('statusBadge').className = 'status-badge' + (c ? ' connected' : '');
+    document.getElementById('statusText').textContent = c ? 'Connecté' : 'Déconnecté';
+    document.getElementById('connectBtn').style.display = c ? 'none' : 'block';
+    document.getElementById('disconnectBtn').style.display = c ? 'block' : 'none';
+  }
+
+  async function startReading() {
+    const decoder = new TextDecoderStream();
+    port.readable.pipeTo(decoder.writable);
+    const inputStream = decoder.readable;
+    reader = inputStream.getReader();
+    let buffer = '';
+
+    try {
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += value;
+        const lines = buffer.split('\n');
+        buffer = lines.pop();
+        lines.forEach(line => {
+          line = line.trim();
+          if (line.startsWith('{')) {
+            try {
+              const d = JSON.parse(line);
+              updateDashboard(d);
+            } catch(e) {}
+          }
+        });
+      }
+    } catch (e) {
+      console.error(e);
+      setConnected(false);
+    }
+  }
+
+  function getAQI(pm25) {
+    if (pm25 < 5)   return { label: 'BON', color: '#00e676', desc: 'Aspiration efficace. Aucune fuite détectée.', pct: pm25/5*0.267 };
+    if (pm25 < 15)  return { label: 'MODÉRÉ', color: '#ffeb3b', desc: 'Niveau acceptable. Surveiller l\'aspiration et les joints du carter.', pct: 0.267 + (pm25-5)/10*0.266 };
+    if (pm25 < 30)  return { label: 'MAUVAIS', color: '#ff7043', desc: 'Aspiration insuffisante ou fuite détectée. Vérifiez les filtres et le carter !', pct: 0.533 + (pm25-15)/15*0.267 };
+    return { label: 'DANGEREUX', color: '#f44336', desc: '⚠️ Fuite importante de microfibrilles carbone ! Arrêtez la machine et vérifiez immédiatement.', pct: Math.min(1, 0.8 + (pm25-30)/30*0.2) };
+  }
+
+  function updateDashboard(d) {
+    const now = new Date();
+    const timeStr = now.toLocaleTimeString('fr-FR');
+
+    // PM values
+    document.getElementById('pm1').textContent  = d.pm1.toFixed(2);
+    document.getElementById('pm25').textContent = d.pm25.toFixed(2);
+    document.getElementById('pm4').textContent  = d.pm4.toFixed(2);
+    document.getElementById('pm10').textContent = d.pm10.toFixed(2);
+
+    // PM bars (max 75 µg/m³)
+    document.getElementById('bar-pm1').style.width  = Math.min(100, d.pm1/75*100)  + '%';
+    document.getElementById('bar-pm25').style.width = Math.min(100, d.pm25/75*100) + '%';
+    document.getElementById('bar-pm4').style.width  = Math.min(100, d.pm4/75*100)  + '%';
+    document.getElementById('bar-pm10').style.width = Math.min(100, d.pm10/75*100) + '%';
+
+    // NC values
+    document.getElementById('nc05').textContent = d.nc05.toFixed(1);
+    document.getElementById('nc1').textContent  = d.nc1.toFixed(1);
+    document.getElementById('nc25').textContent = d.nc25.toFixed(1);
+    document.getElementById('nc4').textContent  = d.nc4.toFixed(1);
+    document.getElementById('nc10').textContent = d.nc10.toFixed(1);
+
+    // Taille typique
+    const sz = d.size.toFixed(2);
+    document.getElementById('sizeVal').textContent = sz;
+    const szPx = Math.max(20, Math.min(80, d.size * 25));
+    document.getElementById('sizeCircle').style.width  = szPx + 'px';
+    document.getElementById('sizeCircle').style.height = szPx + 'px';
+    let sDesc = '';
+    if (d.size < 1)      sDesc = 'Très fines particules. Pénètrent profondément dans les poumons.';
+    else if (d.size < 2) sDesc = 'Particules fines. Peuvent atteindre les alvéoles pulmonaires.';
+    else if (d.size < 5) sDesc = 'Particules moyennes. Retenues par les voies respiratoires.';
+    else                 sDesc = 'Grosses particules. Retenues par le nez et la gorge.';
+    document.getElementById('sizeDesc').textContent = sDesc;
+
+    // AQI
+    const aqi = getAQI(d.pm25);
+    document.getElementById('aqiValue').textContent = d.pm25.toFixed(1);
+    document.getElementById('aqiStatus').textContent = aqi.label;
+    document.getElementById('aqiDesc').textContent = aqi.desc;
+    document.getElementById('aqiCard').style.setProperty('--aqi-color', aqi.color);
+    document.getElementById('aqiValue').style.color = aqi.color;
+    document.getElementById('aqiValue').style.textShadow = `0 0 30px ${aqi.color}`;
+    document.getElementById('aqiStatus').style.color = aqi.color;
+    drawGauge(aqi.pct, aqi.color);
+
+    // Alert
+    const alert = document.getElementById('alertBanner');
+    if (d.pm25 > 15 || d.nc10 > 5000) {
+      alert.className = 'alert-banner show';
+      document.getElementById('alertTitle').textContent = d.pm25 > 30 ? '🚨 DANGER — FUITE MICROFIBRILLES CARBONE' : '⚠️ ALERTE — ASPIRATION INSUFFISANTE';
+      document.getElementById('alertMsg').textContent = d.nc10 > 5000
+        ? `Concentration élevée détectée (NC10: ${d.nc10.toFixed(0)} nb/cm³). Vérifiez l'étanchéité du carter et l'efficacité de l'aspiration.`
+        : `PM2.5 à ${d.pm25.toFixed(1)} µg/m³ (seuil carbone : 15 µg/m³). Vérifiez les filtres et les joints du carter.`;
+    } else {
+      alert.className = 'alert-banner';
+    }
+
+    // Timestamp
+    document.getElementById('timestamp').textContent = `Dernière mesure : ${timeStr}`;
+
+    // Chart
+    const label = timeStr;
+    if (chartLabels.length > 20) {
+      chartLabels.shift(); chartPM1.shift(); chartPM25.shift(); chartPM10.shift();
+    }
+    chartLabels.push(label);
+    chartPM1.push(d.pm1);
+    chartPM25.push(d.pm25);
+    chartPM10.push(d.pm10);
+    pmChart.update();
+
+    // History
+    const badgeClass = aqi.label === 'BON' ? 'badge-good' : aqi.label === 'MODÉRÉ' ? 'badge-moderate' : aqi.label === 'MAUVAIS' ? 'badge-bad' : 'badge-danger';
+    history.unshift({ time: timeStr, pm1: d.pm1, pm25: d.pm25, pm4: d.pm4, pm10: d.pm10, nc10: d.nc10, size: d.size, badge: badgeClass, label: aqi.label });
+    // Pas de limite sur l'historique
+
+    document.getElementById('histCount').textContent = `${history.length} mesure(s)`;
+    const tbody = document.getElementById('historyBody');
+    tbody.innerHTML = history.map(h => `
+      <tr>
+        <td>${h.time}</td>
+        <td>${h.pm1.toFixed(2)}</td>
+        <td>${h.pm25.toFixed(2)}</td>
+        <td>${h.pm4.toFixed(2)}</td>
+        <td>${h.pm10.toFixed(2)}</td>
+        <td>${h.nc10.toFixed(1)}</td>
+        <td>${h.size.toFixed(2)} µm</td>
+        <td><span class="badge ${h.badge}">${h.label}</span></td>
+      </tr>
+    `).join('');
+
+    // Envoi Google Sheets
+    sendToSheets({ ...d, quality: aqi.label, timestamp: new Date().toISOString() });
+  }
+</script>
+</body>
+</html>
